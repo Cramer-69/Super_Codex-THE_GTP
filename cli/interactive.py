@@ -126,7 +126,7 @@ class InteractiveCLI:
         elif cmd == '/skills':
             self._list_skills()
         elif cmd.startswith('/super-codex ') or cmd == '/super-codex':
-            query = command[13:].strip() if cmd.startswith('/super-codex ') else ""
+            query = command[len('/super-codex '):].strip() if cmd.startswith('/super-codex ') else ""
             if query:
                 self._super_codex_query(query)
             else:
@@ -135,7 +135,7 @@ class InteractiveCLI:
                     "usage: [bold]/super-codex <your question>[/bold]"
                 )
         elif cmd.startswith('/council ') or cmd == '/council':
-            query = command[9:].strip() if cmd.startswith('/council ') else ""
+            query = command[len('/council '):].strip() if cmd.startswith('/council ') else ""
             if query:
                 self._council_query(query)
             else:

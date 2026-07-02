@@ -137,6 +137,9 @@ _CALLER_MAP = {
 }
 
 
+_STREAM_CHUNK_SIZE = 120  # chars per streamed content chunk
+
+
 # ---------------------------------------------------------------------------
 # Async helpers
 # ---------------------------------------------------------------------------
@@ -303,23 +306,16 @@ class CouncilConductor:
                 f"--- Relevant memory context ---\n{context}"
             )
 
-        # Gather member responses (async → sync bridge)
+        # Gather member responses (always use a fresh event loop in a thread
+        # so this method works safely from both sync and async callers)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Inside an async context (e.g. FastAPI) — use asyncio.run
-                # via a new thread to avoid nesting
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(
-                        asyncio.run,
-                        _gather_member_responses(enriched_query, self.members),
-                    )
-                    responses = future.result()
-            else:
-                responses = loop.run_until_complete(
-                    _gather_member_responses(enriched_query, self.members)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    asyncio.run,
+                    _gather_member_responses(enriched_query, self.members),
                 )
+                responses = future.result()
         except Exception as exc:
             logger.error(f"CouncilConductor gather error: {exc}")
             responses = []
@@ -371,7 +367,6 @@ class CouncilConductor:
                 }
 
         # Stream final synthesised answer in chunks
-        chunk_size = 120
         text = result["response"]
-        for i in range(0, len(text), chunk_size):
-            yield {"type": "content", "data": text[i: i + chunk_size]}
+        for i in range(0, len(text), _STREAM_CHUNK_SIZE):
+            yield {"type": "content", "data": text[i: i + _STREAM_CHUNK_SIZE]}
