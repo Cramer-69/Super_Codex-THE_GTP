@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # Model Configuration
     conductor_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
+
+    # Super Codex / Council of 4 settings
+    # Model used by Super Codex (solo OpenAI mode). Override with SUPER_CODEX_MODEL.
+    super_codex_model: str = "gpt-4o"
+    # Set to "super_codex" or "council" to change the default conductor mode.
+    conductor_mode: str = "auto"
     
     # Vector Database
     chroma_persist_dir: str = "./data/chroma_db"
