@@ -24,20 +24,42 @@ class InteractiveCLI:
         self.retriever = self.conductor.retriever
         self.vector_store = self.retriever.vector_store
         self.running = True
+        self._super_codex = None
+        self._council = None
         
         console.print(Panel.fit(
-            "[bold cyan]Conductor AI Super Agent[/bold cyan]\n"
+            "[bold cyan]Super Codex — Conductor AI[/bold cyan]\n"
             "[dim]Multi-Model Intelligent Assistant[/dim]\n\n"
+            "Modes:\n"
+            "• [bold white]Standard[/bold white] — default multi-provider mode\n"
+            "• [bold green]/super-codex[/bold green] — ChatGPT-SOLO on OpenAI's best model\n"
+            "• [bold magenta]/council[/bold magenta] — Council of 4 (Codex leads Gemini + Grok + Claude)\n\n"
             "Available Providers:\n"
-            "• [green]Google Gemini[/green] (Primary)\n"
+            "• [green]Google Gemini[/green]\n"
             "• [blue]Grok / xAI[/blue]\n"
             "• [yellow]Perplexity[/yellow]\n"
-            "• [white]OpenAI[/white]",
+            "• [white]OpenAI / Codex (Lead)[/white]",
             border_style="cyan"
         ))
         
         # Show database stats
         self._show_stats()
+
+    # ------------------------------------------------------------------
+    # Lazy helpers for new modes
+    # ------------------------------------------------------------------
+
+    def _get_super_codex(self):
+        if self._super_codex is None:
+            from conductor.super_codex import SuperCodex
+            self._super_codex = SuperCodex(model=settings.super_codex_model)
+        return self._super_codex
+
+    def _get_council(self):
+        if self._council is None:
+            from conductor.council import CouncilConductor
+            self._council = CouncilConductor()
+        return self._council
     
     def _show_stats(self):
         """Show database statistics."""
@@ -103,6 +125,21 @@ class InteractiveCLI:
             self._activate_skill(skill_name)
         elif cmd == '/skills':
             self._list_skills()
+        elif cmd.startswith('/super-codex ') or cmd == '/super-codex':
+            query = command[len('/super-codex '):].strip() if cmd.startswith('/super-codex ') else ""
+            if query:
+                self._super_codex_query(query)
+            else:
+                console.print(
+                    "[green]Super Codex Solo mode[/green] — "
+                    "usage: [bold]/super-codex <your question>[/bold]"
+                )
+        elif cmd.startswith('/council ') or cmd == '/council':
+            query = command[len('/council '):].strip() if cmd.startswith('/council ') else ""
+            if query:
+                self._council_query(query)
+            else:
+                self._show_council_status()
         elif cmd == '/clear':
             console.clear()
             self._show_stats()
@@ -115,15 +152,22 @@ class InteractiveCLI:
     def _show_help(self):
         """Show help message."""
         help_text = """
-# Conductor Agent Commands
+# Super Codex — Conductor Agent Commands
 
-## Search Commands
-- **Ask anything**: Just type your question
+## Standard Search
+- **Ask anything**: Just type your question (standard mode)
 - `/search <query>` - Search conversations
 - `/code <query>` - Search code snippets
 - `/platform <name> <query>` - Search specific platform (chatgpt, gemini, grok, antigravity)
 
-## Superpower Skills (NEW)
+## ⚡ Super Codex — Solo Mode (OpenAI Best Model)
+- `/super-codex <question>` — ChatGPT-SOLO on OpenAI's best model (gpt-4o)
+
+## 🏛️ Council of 4 Super Conductor
+- `/council <question>` — All 4 AI providers answer; Codex/ChatGPT synthesises
+- `/council` — Show council member status (which providers are available)
+
+## Superpower Skills
 - `/skills` - List available skills (brainstorming, TDD, etc.)
 - `/skill <name>` - Activate a superpower skill
 
@@ -136,6 +180,8 @@ class InteractiveCLI:
 ## Examples
 ```
 How did I implement authentication before?
+/super-codex Write me a Python async REST client
+/council Explain the trade-offs between RAG and fine-tuning
 /code python async patterns
 /platform chatgpt explain RAG architecture
 ```
@@ -268,6 +314,91 @@ How did I implement authentication before?
         else:
             console.print(f"\n[red]Skill not found: {name}[/red]")
             console.print("Type /skills to see available options.\n")
+
+    # ------------------------------------------------------------------
+    # Super Codex solo mode
+    # ------------------------------------------------------------------
+
+    def _super_codex_query(self, query: str):
+        """Process a query using Super Codex (OpenAI solo mode)."""
+        console.print(f"\n[bold green]⚡ Super Codex[/bold green]: ", end="")
+        try:
+            sc = self._get_super_codex()
+            for chunk in sc.stream_chat(query):
+                if chunk["type"] == "sources":
+                    pass  # sources shown after
+                elif chunk["type"] == "content":
+                    console.print(chunk["data"], end="")
+                elif chunk["type"] == "error":
+                    console.print(f"\n[red]Error: {chunk['data']}[/red]")
+                    return
+            console.print("\n")
+        except Exception as exc:
+            console.print(f"\n[red]Super Codex error: {exc}[/red]")
+            console.print(
+                "[yellow]Tip: Make sure OPENAI_API_KEY is set in .env[/yellow]"
+            )
+
+    # ------------------------------------------------------------------
+    # Council of 4
+    # ------------------------------------------------------------------
+
+    def _show_council_status(self):
+        """Display which council members are available."""
+        from conductor.council import _COUNCIL_MEMBERS
+        import os
+
+        console.print("\n[bold magenta]🏛️ Council of 4 Super Conductor[/bold magenta]")
+        console.print("[dim]Lead: Codex/ChatGPT (OpenAI)[/dim]\n")
+
+        for name, provider, env_var, model in _COUNCIL_MEMBERS:
+            available = bool(os.getenv(env_var, ""))
+            role = "[bold white]LEAD[/bold white]" if provider == "openai" else "member"
+            status = "[green]✓ available[/green]" if available else "[red]✗ key missing[/red]"
+            console.print(f"  {role:25}  {name:20} ({model})  {status}")
+        console.print()
+
+    def _council_query(self, query: str):
+        """Process a query using the Council of 4."""
+        console.print(f"\n[bold magenta]🏛️ Council of 4[/bold magenta]: querying all members...\n")
+        try:
+            council = self._get_council()
+            member_shown = False
+            response_text = ""
+
+            for chunk in council.stream_chat(query):
+                if chunk["type"] == "sources":
+                    pass  # show after
+                elif chunk["type"] == "council_member":
+                    m = chunk["data"]
+                    if not member_shown:
+                        console.print("[dim]--- Council responses ---[/dim]")
+                        member_shown = True
+                    console.print(
+                        Panel(
+                            m["response"],
+                            title=f"[bold]{m['name']}[/bold] ({m['provider']})",
+                            border_style="dim",
+                            expand=False,
+                        )
+                    )
+                elif chunk["type"] == "content":
+                    if not response_text:
+                        console.print(
+                            "\n[bold magenta]⚡ Codex Lead Synthesis[/bold magenta]:\n"
+                        )
+                    console.print(chunk["data"], end="")
+                    response_text += chunk["data"]
+                elif chunk["type"] == "error":
+                    console.print(f"\n[red]Error: {chunk['data']}[/red]")
+                    return
+
+            console.print("\n")
+        except Exception as exc:
+            console.print(f"\n[red]Council error: {exc}[/red]")
+            console.print(
+                "[yellow]Tip: Configure API keys in .env for each council member[/yellow]"
+            )
 
     def _exit(self):
         """Exit the CLI."""

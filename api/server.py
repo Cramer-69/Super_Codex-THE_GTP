@@ -1,6 +1,7 @@
 """
 FastAPI server for voice-enabled conductor agent.
 Provides REST API and web interface for mobile access.
+Supports Solo (Super Codex), standard, and Council-of-4 modes.
 """
 
 import os
@@ -12,7 +13,7 @@ from pathlib import Path
 _pkg_dir = str(Path(__file__).resolve().parent.parent)
 if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
-from typing import Optional
+from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,9 +26,12 @@ from config.settings import settings
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Conductor Voice Agent",
-    description="Voice-enabled AI assistant with persistent memory",
-    version="1.0.0"
+    title="Super Codex — Conductor Voice Agent",
+    description=(
+        "Voice-enabled AI assistant with persistent memory. "
+        "Supports Solo (Super Codex), standard, and Council-of-4 modes."
+    ),
+    version="2.0.0",
 )
 
 # Add CORS middleware for mobile access
@@ -41,6 +45,8 @@ app.add_middleware(
 
 # Initialize services (lazy initialization to avoid startup crashes)
 conductor = None
+_super_codex_instance = None
+_council_instance = None
 voice_processor = None
 
 
@@ -85,6 +91,28 @@ def get_conductor():
     return conductor
 
 
+def get_super_codex():
+    """Lazy initialization of the Super Codex (solo OpenAI) conductor."""
+    global _super_codex_instance
+    if _super_codex_instance is None:
+        from conductor.super_codex import SuperCodex
+        _super_codex_instance = SuperCodex(model=settings.super_codex_model)
+        logger.info(
+            f"SuperCodex initialised (model={settings.super_codex_model})"
+        )
+    return _super_codex_instance
+
+
+def get_council():
+    """Lazy initialization of the Council of 4 conductor."""
+    global _council_instance
+    if _council_instance is None:
+        from conductor.council import CouncilConductor
+        _council_instance = CouncilConductor()
+        logger.info("CouncilConductor initialised")
+    return _council_instance
+
+
 
 def get_voice_processor_instance():
     """Lazy initialization of voice processor."""
@@ -109,6 +137,21 @@ class ChatResponse(BaseModel):
     response: str
     sources: list
     audio_url: Optional[str] = None
+
+
+class CouncilMemberResponse(BaseModel):
+    name: str
+    provider: str
+    response: Optional[str] = None
+    error: Optional[str] = None
+
+
+class CouncilChatResponse(BaseModel):
+    response: str
+    sources: list
+    council: List[CouncilMemberResponse]
+    members_used: int
+    model: str
 
 
 class VoiceSettings(BaseModel):
@@ -159,11 +202,13 @@ async def health_check():
     providers = settings.configured_providers()
     return {
         "status": "healthy",
-        "service": "conductor-voice-agent",
-        "version": "1.0.0",
+        "service": "super-codex-conductor",
+        "version": "2.0.0",
         "mode": "minimal" if _is_cloud() else "full",
+        "conductor_mode": settings.conductor_mode,
         "providers": providers,
         "api_keys_configured": bool(providers),
+        "super_codex_model": settings.super_codex_model,
     }
 
 
@@ -194,6 +239,83 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/super-codex", response_model=ChatResponse)
+async def super_codex_chat(request: ChatRequest):
+    """
+    Super Codex Solo endpoint — uses OpenAI's best model (gpt-4o) exclusively.
+
+    This is the ChatGPT-SOLO mode: a single powerful AI with no council.
+    """
+    try:
+        logger.info(f"Super Codex request: {request.query[:100]}...")
+        result = get_super_codex().chat(
+            query=request.query,
+            platform_filter=request.platform_filter,
+        )
+        return ChatResponse(
+            response=result["response"],
+            sources=result["sources"],
+        )
+    except Exception as exc:
+        logger.error(f"Error in /api/super-codex: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/council", response_model=CouncilChatResponse)
+async def council_chat(request: ChatRequest):
+    """
+    Council of 4 Super Conductor endpoint.
+
+    Queries all available AI providers (OpenAI/Codex, Gemini, Grok, Claude)
+    concurrently.  Super Codex (OpenAI) acts as Lead and synthesises the
+    council responses into a single, authoritative answer.
+    """
+    try:
+        logger.info(f"Council request: {request.query[:100]}...")
+        result = get_council().chat(
+            query=request.query,
+            platform_filter=request.platform_filter,
+        )
+        council_members = [
+            CouncilMemberResponse(**m) for m in result["council"]
+        ]
+        return CouncilChatResponse(
+            response=result["response"],
+            sources=result["sources"],
+            council=council_members,
+            members_used=result["members_used"],
+            model=result["model"],
+        )
+    except Exception as exc:
+        logger.error(f"Error in /api/council: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/council/status")
+async def council_status():
+    """
+    Returns which council members are available (have API keys configured).
+    """
+    from conductor.council import _COUNCIL_MEMBERS
+    members = []
+    for name, provider, env_var, model in _COUNCIL_MEMBERS:
+        key_set = bool(os.getenv(env_var, ""))
+        members.append(
+            {
+                "name": name,
+                "provider": provider,
+                "model": model,
+                "available": key_set,
+                "role": "lead" if provider == "openai" else "member",
+            }
+        )
+    return {
+        "council": members,
+        "members_available": sum(1 for m in members if m["available"]),
+        "lead": "Codex/ChatGPT (OpenAI)",
+    }
 
 
 @app.post("/api/voice-chat")
