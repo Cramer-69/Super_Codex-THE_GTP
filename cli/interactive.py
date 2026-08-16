@@ -311,7 +311,7 @@ How did I implement authentication before?
         console.print("\n[bold]Available Superpowers:[/bold]")
         for skill_name in skill_names:
             skill = self.conductor.skill_manager.get_skill(skill_name)
-            description = skill.description if skill else ""
+            description = skill.description if skill and skill.description else "No description available"
             console.print(f"• [cyan]{skill_name}[/cyan]: {description[:100]}...")
         console.print()
 

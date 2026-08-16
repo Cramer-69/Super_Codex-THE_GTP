@@ -343,12 +343,12 @@ pytest
 
 ## 🚧 Future Enhancements
 
-- [x ] LangGraph conductor orchestration with specialized sub-agents
-- [ x] Web UI interface
-- [x ] Support for more platforms (Claude, Perplexity)
-- [ x] Real-time conversation sync
-- [x ] Export to NotebookLM format
-- [x ] Conversation analytics and insights
+- [x] LangGraph conductor orchestration with specialized sub-agents
+- [x] Web UI interface
+- [x] Support for more platforms (Claude, Perplexity)
+- [x] Real-time conversation sync
+- [x] Export to NotebookLM format
+- [x] Conversation analytics and insights
 
 ## 📝 License
 
