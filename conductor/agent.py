@@ -113,6 +113,42 @@ class ConductorAgent:
                 )
             else:
                 raise ValueError(f"Unknown provider: {self.provider}")
+
+    def _get_context_and_sources(
+        self,
+        query: str,
+        platform_filter: str = None
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Return formatted retrieval context and source metadata."""
+        if self.retriever is None:
+            return "", []
+
+        results = self.retriever.search_conversations(
+            query=query,
+            n_results=5,
+            platform_filter=platform_filter
+        )
+
+        context_parts = []
+        sources = []
+
+        for result in results:
+            meta = result['metadata']
+            content = result['content']
+
+            source_info = {
+                'platform': meta['platform'],
+                'title': meta['title'],
+                'conversation_id': meta.get('conversation_id', ''),
+                'score': result['score']
+            }
+            sources.append(source_info)
+
+            context_parts.append(
+                f"[Source: {meta['platform'].upper()} - {meta['title']}]\n{content}"
+            )
+
+        return "\n\n---\n\n".join(context_parts), sources
     
     def chat(
         self,
@@ -135,35 +171,7 @@ class ConductorAgent:
         
         # Retrieve relevant context
         logger.info(f"Processing query: {query[:100]}...")
-        
-        results = self.retriever.search_conversations(
-            query=query,
-            n_results=5,
-            platform_filter=platform_filter
-        )
-        
-        # Format context
-        context_parts = []
-        sources = []
-        
-        for result in results:
-            meta = result['metadata']
-            content = result['content']
-            
-            source_info = {
-                'platform': meta['platform'],
-                'title': meta['title'],
-                'conversation_id': meta.get('conversation_id', ''),
-                'score': result['score']
-            }
-            sources.append(source_info)
-            
-            # Add to context
-            context_parts.append(
-                f"[Source: {meta['platform'].upper()} - {meta['title']}]\n{content}"
-            )
-        
-        context = "\n\n---\n\n".join(context_parts)
+        context, sources = self._get_context_and_sources(query, platform_filter)
         
         # Build prompt
         base_system_prompt = """You are a helpful AI assistant with access to the user's conversation history across multiple AI platforms (ChatGPT, Gemini, Grok, and Antigravity).
@@ -274,33 +282,7 @@ Please provide a helpful answer based on this context. Cite which conversations/
             Response chunks
         """
         self._init_client()
-        
-        # Retrieve context
-        results = self.retriever.search_conversations(
-            query=query,
-            n_results=5,
-            platform_filter=platform_filter
-        )
-        
-        # Format context and sources
-        context_parts = []
-        sources = []
-        
-        for result in results:
-            meta = result['metadata']
-            content = result['content']
-            
-            sources.append({
-                'platform': meta['platform'],
-                'title': meta['title'],
-                'score': result['score']
-            })
-            
-            context_parts.append(
-                f"[Source: {meta['platform'].upper()} - {meta['title']}]\n{content}"
-            )
-        
-        context = "\n\n---\n\n".join(context_parts)
+        context, sources = self._get_context_and_sources(query, platform_filter)
         
         # Build prompt
         base_system_prompt = """You are a helpful AI assistant with access to the user's conversation history across multiple AI platforms (ChatGPT, Gemini, Grok, and Antigravity).
@@ -329,6 +311,18 @@ Here is the relevant context from your past conversations:
 {context}
 
 Please provide a helpful answer based on this context. Cite which conversations/platforms you're referencing."""
+
+        if self.provider != "openai":
+            try:
+                result = self.chat(query, platform_filter=platform_filter)
+                yield {'type': 'sources', 'data': result['sources']}
+                response_text = result['response']
+                for i in range(0, len(response_text), 120):
+                    yield {'type': 'content', 'data': response_text[i:i + 120]}
+            except Exception as e:
+                logger.error(f"Error streaming response: {e}")
+                yield {'type': 'error', 'data': str(e)}
+            return
 
         # Stream response
         try:

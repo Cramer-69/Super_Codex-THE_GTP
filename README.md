@@ -35,7 +35,7 @@ This will:
 ### 1. Install Dependencies
 
 ```bash
-cd conductor_agent
+cd /path/to/Super_Codex-THE_GTP
 pip install -r requirements.txt
 ```
 
@@ -104,6 +104,16 @@ python ingest.py --reset --antigravity "C:/Users/jjc29/.gemini/antigravity/brain
 ```bash
 python -m cli.interactive
 ```
+
+### 6. Verify the API
+
+```bash
+python -m api.server
+# then open http://localhost:8080/health
+```
+
+The `/health` response should report `status: "healthy"` and show whether any
+provider keys were detected.
 
 ## 💡 Usage Examples
 
@@ -320,6 +330,16 @@ under **Environment** — do not commit it. Render injects `PORT` automatically.
 | Logs show `No LLM API key is configured` | Set `OPENAI_API_KEY` (or `--set-secrets`) and redeploy. |
 | `/api/chat` returns 500 | Check `/health` — if `api_keys_configured: false`, the key isn't reaching the container. |
 | `FileNotFoundError` for `antigravity_brain_dir` | Leave `ANTIGRAVITY_BRAIN_DIR` blank unless you actually have that folder. |
+
+## 🧪 Developer Checks
+
+From `/home/runner/work/Super_Codex-THE_GTP/Super_Codex-THE_GTP`:
+
+```bash
+ruff check .
+flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+pytest
+```
 
 ## 🚧 Future Enhancements
 
