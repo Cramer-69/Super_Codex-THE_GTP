@@ -35,7 +35,7 @@ This will:
 ### 1. Install Dependencies
 
 ```bash
-cd conductor_agent
+cd /path/to/your-clone
 pip install -r requirements.txt
 ```
 
@@ -104,6 +104,16 @@ python ingest.py --reset --antigravity "C:/Users/jjc29/.gemini/antigravity/brain
 ```bash
 python -m cli.interactive
 ```
+
+### 6. Verify the API
+
+```bash
+python -m api.server
+# then open http://localhost:8080/health
+```
+
+The `/health` response should report `status: "healthy"` and show whether any
+provider keys were detected.
 
 ## 💡 Usage Examples
 
@@ -321,14 +331,24 @@ under **Environment** — do not commit it. Render injects `PORT` automatically.
 | `/api/chat` returns 500 | Check `/health` — if `api_keys_configured: false`, the key isn't reaching the container. |
 | `FileNotFoundError` for `antigravity_brain_dir` | Leave `ANTIGRAVITY_BRAIN_DIR` blank unless you actually have that folder. |
 
+## 🧪 Developer Checks
+
+From the repository root:
+
+```bash
+ruff check .
+flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+pytest
+```
+
 ## 🚧 Future Enhancements
 
-- [x ] LangGraph conductor orchestration with specialized sub-agents
-- [ x] Web UI interface
-- [x ] Support for more platforms (Claude, Perplexity)
-- [ x] Real-time conversation sync
-- [x ] Export to NotebookLM format
-- [x ] Conversation analytics and insights
+- [x] LangGraph conductor orchestration with specialized sub-agents
+- [x] Web UI interface
+- [x] Support for more platforms (Claude, Perplexity)
+- [x] Real-time conversation sync
+- [x] Export to NotebookLM format
+- [x] Conversation analytics and insights
 
 ## 📝 License
 

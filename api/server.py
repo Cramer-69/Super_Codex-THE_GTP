@@ -97,9 +97,17 @@ def get_super_codex():
     if _super_codex_instance is None:
         from conductor.super_codex import SuperCodex
         _super_codex_instance = SuperCodex(model=settings.super_codex_model)
+        base_conductor = get_conductor()
+        _super_codex_instance.retriever = getattr(base_conductor, "retriever", None)
+        _super_codex_instance.skill_manager = getattr(base_conductor, "skill_manager", None)
+        _super_codex_instance.current_skill = getattr(base_conductor, "current_skill", None)
         logger.info(
             f"SuperCodex initialised (model={settings.super_codex_model})"
         )
+    if conductor is not None:
+        _super_codex_instance.retriever = getattr(conductor, "retriever", None)
+        _super_codex_instance.skill_manager = getattr(conductor, "skill_manager", None)
+        _super_codex_instance.current_skill = getattr(conductor, "current_skill", None)
     return _super_codex_instance
 
 
@@ -109,8 +117,30 @@ def get_council():
     if _council_instance is None:
         from conductor.council import CouncilConductor
         _council_instance = CouncilConductor()
+        base_conductor = get_conductor()
+        shared_retriever = getattr(base_conductor, "retriever", None)
+        _council_instance.retriever = shared_retriever
+        _council_instance._lead.retriever = shared_retriever
+        _council_instance._lead.skill_manager = getattr(base_conductor, "skill_manager", None)
+        _council_instance._lead.current_skill = getattr(base_conductor, "current_skill", None)
         logger.info("CouncilConductor initialised")
+    if conductor is not None:
+        shared_retriever = getattr(conductor, "retriever", None)
+        _council_instance.retriever = shared_retriever
+        _council_instance._lead.retriever = shared_retriever
+        _council_instance._lead.skill_manager = getattr(conductor, "skill_manager", None)
+        _council_instance._lead.current_skill = getattr(conductor, "current_skill", None)
     return _council_instance
+
+
+def get_default_chat_agent():
+    """Return the default agent for /api/chat based on configured mode."""
+    mode = settings.conductor_mode.lower()
+    if mode == "super_codex":
+        return get_super_codex()
+    if mode == "council":
+        return get_council()
+    return get_conductor()
 
 
 
@@ -226,7 +256,7 @@ async def chat(request: ChatRequest):
     try:
         logger.info(f"Chat request: {request.query[:100]}...")
 
-        result = get_conductor().chat(
+        result = get_default_chat_agent().chat(
             query=request.query,
             platform_filter=request.platform_filter
         )

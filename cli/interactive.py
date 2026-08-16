@@ -53,12 +53,19 @@ class InteractiveCLI:
         if self._super_codex is None:
             from conductor.super_codex import SuperCodex
             self._super_codex = SuperCodex(model=settings.super_codex_model)
+        self._super_codex.retriever = self.conductor.retriever
+        self._super_codex.skill_manager = self.conductor.skill_manager
+        self._super_codex.current_skill = self.conductor.current_skill
         return self._super_codex
 
     def _get_council(self):
         if self._council is None:
             from conductor.council import CouncilConductor
             self._council = CouncilConductor()
+        self._council.retriever = self.conductor.retriever
+        self._council._lead.retriever = self.conductor.retriever
+        self._council._lead.skill_manager = self.conductor.skill_manager
+        self._council._lead.current_skill = self.conductor.current_skill
         return self._council
     
     def _show_stats(self):
@@ -296,14 +303,17 @@ How did I implement authentication before?
     
     def _list_skills(self):
         """List available skills."""
-        skills = self.conductor.skill_manager.list_skills()
-        if not skills:
+        skill_names = self.conductor.skill_manager.list_skills()
+        if not skill_names:
             console.print("[yellow]No skills loaded.[/yellow]")
             return
 
         console.print("\n[bold]Available Superpowers:[/bold]")
-        for skill in skills:
-            console.print(f"• [cyan]{skill.name}[/cyan]: {skill.description[:100]}...")
+        for skill_name in skill_names:
+            skill = self.conductor.skill_manager.get_skill(skill_name)
+            description = skill.description if skill and skill.description else "No description available"
+            suffix = "..." if len(description) > 100 else ""
+            console.print(f"• [cyan]{skill_name}[/cyan]: {description[:100]}{suffix}")
         console.print()
 
     def _activate_skill(self, name: str):

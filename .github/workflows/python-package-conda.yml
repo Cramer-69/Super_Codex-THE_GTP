@@ -16,7 +16,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-cloud.txt
-          pip install flake8 pytest
+          pip install flake8 pytest ruff
+      - name: Lint with Ruff
+        run: |
+          ruff check .
       - name: Lint with flake8
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
