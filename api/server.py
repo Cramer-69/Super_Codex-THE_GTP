@@ -104,6 +104,10 @@ def get_super_codex():
         logger.info(
             f"SuperCodex initialised (model={settings.super_codex_model})"
         )
+    if conductor is not None:
+        _super_codex_instance.retriever = getattr(conductor, "retriever", None)
+        _super_codex_instance.skill_manager = getattr(conductor, "skill_manager", None)
+        _super_codex_instance.current_skill = getattr(conductor, "current_skill", None)
     return _super_codex_instance
 
 
@@ -120,6 +124,12 @@ def get_council():
         _council_instance._lead.skill_manager = getattr(base_conductor, "skill_manager", None)
         _council_instance._lead.current_skill = getattr(base_conductor, "current_skill", None)
         logger.info("CouncilConductor initialised")
+    if conductor is not None:
+        shared_retriever = getattr(conductor, "retriever", None)
+        _council_instance.retriever = shared_retriever
+        _council_instance._lead.retriever = shared_retriever
+        _council_instance._lead.skill_manager = getattr(conductor, "skill_manager", None)
+        _council_instance._lead.current_skill = getattr(conductor, "current_skill", None)
     return _council_instance
 
 

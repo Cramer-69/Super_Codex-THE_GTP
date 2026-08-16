@@ -312,7 +312,8 @@ How did I implement authentication before?
         for skill_name in skill_names:
             skill = self.conductor.skill_manager.get_skill(skill_name)
             description = skill.description if skill and skill.description else "No description available"
-            console.print(f"• [cyan]{skill_name}[/cyan]: {description[:100]}...")
+            suffix = "..." if len(description) > 100 else ""
+            console.print(f"• [cyan]{skill_name}[/cyan]: {description[:100]}{suffix}")
         console.print()
 
     def _activate_skill(self, name: str):
