@@ -282,6 +282,19 @@ Please provide a helpful answer based on this context. Cite which conversations/
             Response chunks
         """
         self._init_client()
+
+        if self.provider != "openai":
+            try:
+                result = self.chat(query, platform_filter=platform_filter)
+                yield {'type': 'sources', 'data': result['sources']}
+                response_text = result['response']
+                for i in range(0, len(response_text), 120):
+                    yield {'type': 'content', 'data': response_text[i:i + 120]}
+            except Exception as e:
+                logger.error(f"Error streaming response: {e}")
+                yield {'type': 'error', 'data': str(e)}
+            return
+
         context, sources = self._get_context_and_sources(query, platform_filter)
         
         # Build prompt
@@ -311,18 +324,6 @@ Here is the relevant context from your past conversations:
 {context}
 
 Please provide a helpful answer based on this context. Cite which conversations/platforms you're referencing."""
-
-        if self.provider != "openai":
-            try:
-                result = self.chat(query, platform_filter=platform_filter)
-                yield {'type': 'sources', 'data': result['sources']}
-                response_text = result['response']
-                for i in range(0, len(response_text), 120):
-                    yield {'type': 'content', 'data': response_text[i:i + 120]}
-            except Exception as e:
-                logger.error(f"Error streaming response: {e}")
-                yield {'type': 'error', 'data': str(e)}
-            return
 
         # Stream response
         try:

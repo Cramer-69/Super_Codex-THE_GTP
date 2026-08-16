@@ -35,7 +35,7 @@ This will:
 ### 1. Install Dependencies
 
 ```bash
-cd /path/to/Super_Codex-THE_GTP
+cd /path/to/your-clone
 pip install -r requirements.txt
 ```
 
@@ -333,7 +333,7 @@ under **Environment** — do not commit it. Render injects `PORT` automatically.
 
 ## 🧪 Developer Checks
 
-From `/home/runner/work/Super_Codex-THE_GTP/Super_Codex-THE_GTP`:
+From the repository root:
 
 ```bash
 ruff check .
