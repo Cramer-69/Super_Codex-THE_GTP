@@ -15,7 +15,7 @@ def _provider_for_keys() -> tuple:
     if os.getenv("OPENAI_API_KEY", "").startswith("sk-"):
         return "openai", "gpt-4o-mini"
     if os.getenv("ANTHROPIC_API_KEY"):
-        return "anthropic", "claude-3-5-haiku-latest"
+        return "anthropic", "claude-opus-4-8"
     if os.getenv("XAI_API_KEY"):
         return "xai", "grok-2-latest"
     return "none", "minimal"

@@ -29,7 +29,7 @@ _COUNCIL_MEMBERS = [
     ("Codex/ChatGPT", "openai",    "OPENAI_API_KEY",    "gpt-4o"),
     ("Gemini",        "google",    "GOOGLE_API_KEY",    "gemini-1.5-flash"),
     ("Grok",          "xai",       "XAI_API_KEY",       "grok-2-latest"),
-    ("Claude",        "anthropic", "ANTHROPIC_API_KEY", "claude-3-5-haiku-latest"),
+    ("Claude",        "anthropic", "ANTHROPIC_API_KEY", "claude-opus-4-8"),
 ]
 
 _MEMBER_SYSTEM_PROMPT = """\
